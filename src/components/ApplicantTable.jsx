@@ -11,8 +11,9 @@ import {
   SearchCheck,
   X,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
-import { getResumeUrl, updateStatus } from '../api/api';
+import { getResumeUrl, updateStatus, deleteApplicant } from '../api/api';
 import { APPLICATION_STATUSES } from '../data/formOptions';
 
 const statusLabel = (status) => (
@@ -30,6 +31,18 @@ export default function ApplicantTable({ applicants, onStatusChange }) {
       onStatusChange();
     } catch {
       setMessage('Status could not be updated. Please try again.');
+    }
+  };
+
+  const handleDelete = async (applicant) => {
+    if (!window.confirm(`Are you sure you want to delete ${applicant.full_name}? This action cannot be undone.`)) return;
+    try {
+      await deleteApplicant(applicant.id, applicant.resume_path);
+      setMessage('Applicant deleted successfully.');
+      setSelected(null);
+      onStatusChange();
+    } catch {
+      setMessage('Applicant could not be deleted. Please try again.');
     }
   };
 
@@ -99,7 +112,10 @@ export default function ApplicantTable({ applicants, onStatusChange }) {
                 <h2>{selected.full_name}</h2>
                 <p>{selected.preferred_role || selected.work_type}</p>
               </div>
-              <button className="icon-action" type="button" onClick={() => setSelected(null)} aria-label="Close details"><X size={19} /></button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                <button className="icon-action" type="button" onClick={() => handleDelete(selected)} aria-label="Delete applicant" title="Delete Applicant"><Trash2 size={19} color="#d32f2f" /></button>
+                <button className="icon-action" type="button" onClick={() => setSelected(null)} aria-label="Close details" title="Close"><X size={19} /></button>
+              </div>
             </header>
             <div className="detail-contact">
               <a href={`tel:${selected.phone}`}><Phone size={15} /> {selected.phone}</a>

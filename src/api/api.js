@@ -122,6 +122,16 @@ export const updateStatus = async (id, status) => {
   return { data: { message: 'Status updated.' } };
 };
 
+export const deleteApplicant = async (id, resumePath) => {
+  if (resumePath) {
+    const { error: storageError } = await supabase.storage.from(RESUME_BUCKET).remove([resumePath]);
+    if (storageError) console.error('Failed to delete resume:', storageError);
+  }
+  const { error } = await supabase.from('applicants').delete().eq('id', id);
+  if (error) throw { response: { status: 500, data: { message: error.message } } };
+  return { data: { message: 'Applicant deleted successfully.' } };
+};
+
 export const getResumeUrl = async (applicant) => {
   if (!applicant.resume_path) return null;
   const { data, error } = await supabase.storage.from(RESUME_BUCKET).createSignedUrl(applicant.resume_path, 120);
