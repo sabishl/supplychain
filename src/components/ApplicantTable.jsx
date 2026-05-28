@@ -1,135 +1,140 @@
-import React from 'react';
-import { updateStatus } from '../api/api';
-import { Phone, Mail, Award, Calendar, SearchCheck } from 'lucide-react';
+import { useState } from 'react';
+import {
+  Award,
+  Briefcase,
+  Calendar,
+  Download,
+  FileText,
+  Mail,
+  MapPin,
+  Phone,
+  SearchCheck,
+  X,
+} from 'lucide-react';
+import { getResumeUrl, updateStatus } from '../api/api';
+import { APPLICATION_STATUSES } from '../data/formOptions';
+
+const statusLabel = (status) => (
+  APPLICATION_STATUSES.find((item) => item.value === status)?.label || status
+);
 
 export default function ApplicantTable({ applicants, onStatusChange }) {
-  const handleStatusUpdate = async (id, newStatus) => {
+  const [selected, setSelected] = useState(null);
+  const [message, setMessage] = useState('');
+
+  const handleStatusUpdate = async (id, status) => {
     try {
-      await updateStatus(id, newStatus);
-      onStatusChange(); // Trigger reload of applicants in parent page
+      await updateStatus(id, status);
+      setSelected((applicant) => applicant?.id === id ? { ...applicant, status } : applicant);
+      onStatusChange();
+    } catch {
+      setMessage('Status could not be updated. Please try again.');
+    }
+  };
+
+  const viewResume = async (applicant) => {
+    if (!applicant.resume_path) return;
+    try {
+      const url = await getResumeUrl(applicant);
+      if (!url) {
+        setMessage('Resume preview is available in live mode after private storage is configured.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      console.error('Failed to update status:', error);
-      alert('Error updating applicant status. Please try again.');
+      setMessage(error.response?.data?.message || 'Resume could not be opened.');
     }
   };
 
   if (applicants.length === 0) {
     return (
-      <div className="table-container animate-fade-in">
+      <div className="table-container">
         <div className="empty-state">
-          <SearchCheck size={64} style={{ color: 'var(--text-muted)' }} />
-          <h3>No Applicants Found</h3>
-          <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
-            No records match the current filter selection. Try adjusting or resetting your filters.
-          </p>
+          <SearchCheck size={52} />
+          <h3>No candidates found</h3>
+          <p>Adjust your filters or search term to see more applications.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="table-container animate-fade-in">
-      <div className="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Applicant Name</th>
-              <th>Contact Details</th>
-              <th>District & State</th>
-              <th>Qualification</th>
-              <th>Work Details</th>
-              <th style={{ textAlign: 'center' }}>Exp (Yrs)</th>
-              <th>Skills</th>
-              <th>Application Status</th>
-              <th>Registered Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {applicants.map((a, i) => (
-              <tr key={a.id}>
-                <td style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
-                  #{a.id}
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {a.full_name}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.8rem' }}>
-                    <a href={`tel:${a.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      <Phone size={12} />
-                      {a.phone}
-                    </a>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)' }}>
-                      <Mail size={12} />
-                      {a.email}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: 600 }}>{a.district}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      {a.state || 'Kerala'}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Award size={14} style={{ color: 'var(--color-accent)' }} />
-                    <span>{a.education}</span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontWeight: 500 }}>{a.work_type}</span>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center', fontWeight: 600 }}>
-                  {a.experience_years}
-                </td>
-                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
-                  {a.skills ? (
-                    <span style={{ fontSize: '0.8rem', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                      {a.skills}
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>—</span>
-                  )}
-                </td>
-                <td>
-                  <div className={`status-select-wrapper ${a.status}`}>
-                    <select
-                      className="status-select"
-                      value={a.status}
-                      onChange={(e) => handleStatusUpdate(a.id, e.target.value)}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="shortlisted">Shortlisted</option>
-                      <option value="placed">Placed</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                    <Calendar size={12} />
-                    {new Date(a.created_at).toLocaleDateString('en-IN', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <>
+      {message && <div className="dashboard-message">{message}<button onClick={() => setMessage('')} type="button"><X size={14} /></button></div>}
+      <div className="candidate-list">
+        {applicants.map((applicant) => (
+          <article className="candidate-card" key={applicant.id}>
+            <div className="candidate-primary">
+              <span className="candidate-reference">{applicant.application_reference || `#${applicant.id}`}</span>
+              <h3>{applicant.full_name}</h3>
+              <p><Briefcase size={14} /> {applicant.preferred_role || applicant.work_type}</p>
+            </div>
+            <div className="candidate-meta">
+              <span><MapPin size={14} /> {applicant.district}, {applicant.state}</span>
+              <span><Award size={14} /> {applicant.education}{applicant.course_name ? ` - ${applicant.course_name}` : ''}</span>
+              <span>{applicant.experience_years} yrs experience</span>
+            </div>
+            <div className="candidate-actions">
+              {applicant.resume_path && <span className="cv-badge"><FileText size={13} /> CV</span>}
+              <span className={`status-badge ${applicant.status}`}>{statusLabel(applicant.status)}</span>
+              <button type="button" className="btn btn-outline" onClick={() => setSelected(applicant)}>View profile</button>
+            </div>
+          </article>
+        ))}
       </div>
-    </div>
+      {selected && (
+        <div className="detail-backdrop" onClick={() => setSelected(null)}>
+          <aside className="candidate-detail" onClick={(event) => event.stopPropagation()}>
+            <header className="detail-header">
+              <div>
+                <span className="candidate-reference">{selected.application_reference || `#${selected.id}`}</span>
+                <h2>{selected.full_name}</h2>
+                <p>{selected.preferred_role || selected.work_type}</p>
+              </div>
+              <button className="icon-action" type="button" onClick={() => setSelected(null)} aria-label="Close details"><X size={19} /></button>
+            </header>
+            <div className="detail-contact">
+              <a href={`tel:${selected.phone}`}><Phone size={15} /> {selected.phone}</a>
+              {selected.email && <a href={`mailto:${selected.email}`}><Mail size={15} /> {selected.email}</a>}
+            </div>
+            <DetailSection title="Location">
+              <p>{[selected.city, selected.district, selected.state, selected.pincode].filter(Boolean).join(', ')}</p>
+              {selected.willing_to_relocate && <span className="positive-tag">Open to relocation</span>}
+            </DetailSection>
+            <DetailSection title="Education">
+              <p>{[selected.education, selected.course_name, selected.institution_name, selected.passing_year].filter(Boolean).join(' | ')}</p>
+              {selected.certificate_available && <p>Certificate available: {selected.certificate_available}</p>}
+            </DetailSection>
+            <DetailSection title="Work profile">
+              <p><strong>{selected.work_type}</strong> | {selected.experience_years} years experience</p>
+              <p>{selected.skills || 'No additional skills provided.'}</p>
+              <p>Available: {selected.availability || 'Not provided'}</p>
+            </DetailSection>
+            <DetailSection title="Resume">
+              {selected.resume_path ? (
+                <button className="btn btn-outline" type="button" onClick={() => viewResume(selected)}>
+                  <Download size={15} /> View resume
+                </button>
+              ) : <p>No resume uploaded.</p>}
+            </DetailSection>
+            <DetailSection title="Hiring stage">
+              <select className="stage-control" value={selected.status} onChange={(event) => handleStatusUpdate(selected.id, event.target.value)}>
+                {APPLICATION_STATUSES.map((status) => <option value={status.value} key={status.value}>{status.label}</option>)}
+              </select>
+              <p className="submitted-date"><Calendar size={14} /> Submitted {new Date(selected.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+            </DetailSection>
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}
+
+function DetailSection({ title, children }) {
+  return (
+    <section className="detail-section">
+      <h3>{title}</h3>
+      {children}
+    </section>
   );
 }

@@ -1,471 +1,171 @@
-import axios from 'axios';
-import * as XLSX from 'xlsx';
-import { supabase, isSupabaseConfigured } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 
-// Base API instance (maintained for backward compatibility if ever needed)
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const api = axios.create({
-  baseURL: BASE_URL,
-});
+const RESUME_BUCKET = 'applicant-resumes';
 
-// Helper to determine if we are in Demo Mode
-export const isDemoMode = () => {
-  if (!isSupabaseConfigured) {
-    return true; // Force demo mode if Supabase is not configured yet
-  }
-  const mode = localStorage.getItem('app_mode');
-  if (!mode) {
-    localStorage.setItem('app_mode', 'live'); // Default to live (Supabase) if configured
-    return false;
-  }
-  return mode === 'demo';
+const buildReference = () => {
+  const year = new Date().getFullYear();
+  const code = crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();
+  return `MC-${year}-${code}`;
 };
 
-// Seed mock data if localStorage is empty (Demo Mode)
-const SEED_DATA = [
-  {
-    id: 1,
-    full_name: 'Anjali Nair',
-    email: 'anjali.nair@email.com',
-    phone: '9845612307',
-    address: 'Nair Villa, Palarivattom',
-    district: 'Ernakulam',
-    state: 'Kerala',
-    education: 'Degree',
-    work_type: 'IT Support',
-    experience_years: 3,
-    skills: 'MS Office, Hardware troubleshooting, Networking',
-    status: 'pending',
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 2,
-    full_name: 'Rahul Kumar',
-    email: 'rahul.k@email.com',
-    phone: '9746123456',
-    address: 'Kumar Nivas, Kaloor',
-    district: 'Ernakulam',
-    state: 'Kerala',
-    education: 'Diploma',
-    work_type: 'Electrician',
-    experience_years: 5,
-    skills: 'Industrial Wiring, Panel maintenance',
-    status: 'shortlisted',
-    created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 3,
-    full_name: 'Suresh Gopalan',
-    email: 'suresh.g@email.com',
-    phone: '9447123987',
-    address: 'Suresh Bhavan, East Fort',
-    district: 'Thiruvananthapuram',
-    state: 'Kerala',
-    education: 'SSLC',
-    work_type: 'Driver',
-    experience_years: 12,
-    skills: 'Heavy vehicles, Kerala Route knowledge, HMV License',
-    status: 'placed',
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 4,
-    full_name: 'Devika M.',
-    email: 'devika.m@email.com',
-    phone: '8129456789',
-    address: 'Murali Nivas, Nilambur',
-    district: 'Malappuram',
-    state: 'Kerala',
-    education: 'Plus Two',
-    work_type: 'Cleaning Staff',
-    experience_years: 1,
-    skills: 'Housekeeping, Office cleaning',
-    status: 'pending',
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 5,
-    full_name: 'Jithin Joseph',
-    email: 'jithin.j@email.com',
-    phone: '7012345678',
-    address: 'Joseph Cottage, Kanjirappally',
-    district: 'Kottayam',
-    state: 'Kerala',
-    education: 'ITI',
-    work_type: 'Plumber',
-    experience_years: 0,
-    skills: 'Pipeline repair, Sanitary fittings',
-    status: 'rejected',
-    created_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
+async function uploadResume(reference, resumeFile) {
+  if (!resumeFile) return {};
 
-const getDemoApplicants = () => {
-  const data = localStorage.getItem('demo_applicants');
-  if (!data) {
-    localStorage.setItem('demo_applicants', JSON.stringify(SEED_DATA));
-    return SEED_DATA;
-  }
-  return JSON.parse(data);
-};
+  const extension = resumeFile.name.split('.').pop()?.toLowerCase() || 'pdf';
+  const resumePath = `${reference}/resume.${extension}`;
+  const { error } = await supabase.storage
+    .from(RESUME_BUCKET)
+    .upload(resumePath, resumeFile, { contentType: resumeFile.type, upsert: false });
 
-const saveDemoApplicants = (applicants) => {
-  localStorage.setItem('demo_applicants', JSON.stringify(applicants));
-};
-
-// Helper function to filter client-side data
-const filterDemoData = (applicants, filters) => {
-  let result = [...applicants];
-  
-  if (filters.district) {
-    result = result.filter(a => a.district.toLowerCase() === filters.district.toLowerCase());
-  }
-  if (filters.education) {
-    result = result.filter(a => a.education.toLowerCase() === filters.education.toLowerCase());
-  }
-  if (filters.work_type) {
-    result = result.filter(a => a.work_type.toLowerCase() === filters.work_type.toLowerCase());
-  }
-  if (filters.min_exp) {
-    const minVal = parseInt(filters.min_exp, 10);
-    result = result.filter(a => a.experience_years >= minVal);
-  }
-  if (filters.max_exp) {
-    const maxVal = parseInt(filters.max_exp, 10);
-    result = result.filter(a => a.experience_years <= maxVal);
-  }
-  if (filters.status) {
-    result = result.filter(a => a.status.toLowerCase() === filters.status.toLowerCase());
-  }
-  
-  // Sort by registration date - newest first
-  result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
-  return result;
-};
-
-// ----------------------------------------------------
-// API Client Methods (Dual Mode)
-// ----------------------------------------------------
-
-// 1. Worker Registration
-export const registerApplicant = async (formData) => {
-  if (isDemoMode()) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const applicants = getDemoApplicants();
-        
-        // Email unique check
-        const isDuplicate = applicants.some(
-          (a) => a.email.toLowerCase() === formData.email.toLowerCase()
-        );
-        if (isDuplicate) {
-          reject({
-            response: {
-              status: 409,
-              data: { message: 'This email is already registered.' }
-            }
-          });
-          return;
-        }
-
-        const newId = applicants.length > 0 ? Math.max(...applicants.map(a => a.id)) + 1 : 1;
-        const newApplicant = {
-          id: newId,
-          ...formData,
-          state: formData.state || 'Kerala',
-          experience_years: parseInt(formData.experience_years, 10) || 0,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        };
-
-        applicants.push(newApplicant);
-        saveDemoApplicants(applicants);
-        resolve({ data: { message: 'Registration successful!', applicant: newApplicant } });
-      }, 800); // simulate network lag
-    });
-  } else {
-    // Supabase Mode
-    const { data, error } = await supabase
-      .from('applicants')
-      .insert([
-        {
-          full_name: formData.full_name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          district: formData.district,
-          state: formData.state || 'Kerala',
-          education: formData.education,
-          work_type: formData.work_type,
-          experience_years: parseInt(formData.experience_years, 10) || 0,
-          skills: formData.skills,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        }
-      ])
-      .select();
-
-    if (error) {
-      throw {
-        response: {
-          status: error.code === '23505' ? 409 : 500,
-          data: { message: error.code === '23505' ? 'This email is already registered.' : error.message }
-        }
-      };
-    }
-
-    return { data: { message: 'Registration successful!', applicant: data[0] } };
-  }
-};
-
-// 2. Admin Login
-export const adminLogin = async (email, password) => {
-  if (isDemoMode()) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Mock admin credentials
-        const ADMIN_EMAIL = 'admin@yourcompany.com';
-        const ADMIN_PASSWORD = 'YourStrongPassword123!';
-        
-        if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          resolve({ data: { token: 'mock_jwt_token_demo_12345' } });
-        } else {
-          reject({
-            response: {
-              status: 401,
-              data: { message: 'Invalid email or password' }
-            }
-          });
-        }
-      }, 600);
-    });
-  } else {
-    // Supabase Login
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      throw {
-        response: {
-          status: 401,
-          data: { message: error.message }
-        }
-      };
-    }
-
-    return { data: { token: data.session.access_token } };
-  }
-};
-
-// 2.5 Admin Logout
-export const adminLogout = async () => {
-  localStorage.removeItem('admin_token');
-  if (!isDemoMode()) {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error('Supabase signOut error:', err);
-    }
-  }
-};
-
-// 3. Fetch Applicants (Admin)
-export const fetchApplicants = async (filters) => {
-  if (isDemoMode()) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const all = getDemoApplicants();
-        const filtered = filterDemoData(all, filters);
-        resolve({
-          data: {
-            total: filtered.length,
-            applicants: filtered,
-          }
-        });
-      }, 500);
-    });
-  } else {
-    // Supabase Fetch
-    let query = supabase
-      .from('applicants')
-      .select('*', { count: 'exact' });
-
-    if (filters.district) {
-      query = query.eq('district', filters.district);
-    }
-    if (filters.education) {
-      query = query.eq('education', filters.education);
-    }
-    if (filters.work_type) {
-      query = query.eq('work_type', filters.work_type);
-    }
-    if (filters.min_exp) {
-      query = query.gte('experience_years', parseInt(filters.min_exp, 10));
-    }
-    if (filters.max_exp) {
-      query = query.lte('experience_years', parseInt(filters.max_exp, 10));
-    }
-    if (filters.status) {
-      query = query.eq('status', filters.status.toLowerCase());
-    }
-
-    // Sort by registration date - newest first
-    query = query.order('created_at', { ascending: false });
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      throw {
-        response: {
-          status: 500,
-          data: { message: error.message }
-        }
-      };
-    }
-
-    return {
-      data: {
-        total: count || 0,
-        applicants: data || [],
-      }
+  if (error) {
+    throw {
+      response: {
+        status: 500,
+        data: { message: `Resume upload failed: ${error.message}` },
+      },
     };
   }
+
+  return {
+    resume_path: resumePath,
+    resume_original_name: resumeFile.name,
+    resume_mime_type: resumeFile.type,
+    resume_size_bytes: resumeFile.size,
+    resume_uploaded_at: new Date().toISOString(),
+  };
+}
+
+export const registerApplicant = async (formData, resumeFile) => {
+  const applicationReference = buildReference();
+  const applicantValues = {
+    ...formData,
+    email: formData.email.trim() || null,
+    experience_years: Number(formData.experience_years) || 0,
+    expected_salary: formData.expected_salary ? Number(formData.expected_salary) : null,
+    application_reference: applicationReference,
+    consent_accepted_at: new Date().toISOString(),
+    status: 'new',
+    created_at: new Date().toISOString(),
+  };
+  delete applicantValues.consent_accepted;
+
+  const resumeValues = await uploadResume(applicationReference, resumeFile);
+  const { error } = await supabase
+    .from('applicants')
+    .insert([{ ...applicantValues, ...resumeValues }]);
+
+  if (error) {
+    throw {
+      response: {
+        status: error.code === '23505' ? 409 : 500,
+        data: { message: error.code === '23505' ? 'This email is already registered.' : error.message },
+      },
+    };
+  }
+
+  return {
+    data: {
+      message: 'Application submitted successfully.',
+      applicant: { ...applicantValues, ...resumeValues },
+    },
+  };
 };
 
-// 4. Update Status (Admin)
+export const adminLogin = async (email, password) => {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw { response: { status: 401, data: { message: error.message } } };
+
+  // Check if the authenticated user is in the admin_users table
+  const { data: adminRecord, error: adminError } = await supabase
+    .from('admin_users')
+    .select('id')
+    .eq('user_id', data.user.id)
+    .maybeSingle();
+
+  if (adminError || !adminRecord) {
+    await supabase.auth.signOut();
+    throw { response: { status: 403, data: { message: 'Your account is not authorized for the admin dashboard.' } } };
+  }
+
+  return { data: { user: data.user } };
+};
+
+export const adminLogout = async () => {
+  await supabase.auth.signOut();
+};
+
+export const fetchApplicants = async (filters = {}) => {
+  let query = supabase.from('applicants').select('*', { count: 'exact' });
+  if (filters.search) {
+    const search = filters.search.replaceAll(',', ' ');
+    query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,application_reference.ilike.%${search}%`);
+  }
+  if (filters.state) query = query.eq('state', filters.state);
+  if (filters.district) query = query.eq('district', filters.district);
+  if (filters.education) query = query.eq('education', filters.education);
+  if (filters.work_type) query = query.eq('work_type', filters.work_type);
+  if (filters.min_exp !== undefined && filters.min_exp !== '') query = query.gte('experience_years', Number(filters.min_exp));
+  if (filters.max_exp !== undefined && filters.max_exp !== '') query = query.lte('experience_years', Number(filters.max_exp));
+  if (filters.resume === 'yes') query = query.not('resume_path', 'is', null);
+  if (filters.resume === 'no') query = query.is('resume_path', null);
+  if (filters.status) query = query.eq('status', filters.status);
+
+  const { data, error, count } = await query.order('created_at', { ascending: false });
+  if (error) throw { response: { status: 500, data: { message: error.message } } };
+  return { data: { total: count || 0, applicants: data || [] } };
+};
+
 export const updateStatus = async (id, status) => {
-  if (isDemoMode()) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const all = getDemoApplicants();
-        const index = all.findIndex(a => a.id === parseInt(id, 10));
-        if (index !== -1) {
-          all[index].status = status;
-          saveDemoApplicants(all);
-          resolve({ data: { message: 'Status updated successfully.' } });
-        } else {
-          reject({ response: { status: 404, data: { message: 'Applicant not found.' } } });
-        }
-      }, 300);
-    });
-  } else {
-    // Supabase Update
-    const { data, error } = await supabase
-      .from('applicants')
-      .update({ status })
-      .eq('id', id)
-      .select();
-
-    if (error) {
-      throw {
-        response: {
-          status: 500,
-          data: { message: error.message }
-        }
-      };
-    }
-
-    if (!data || data.length === 0) {
-      throw { response: { status: 404, data: { message: 'Applicant not found.' } } };
-    }
-
-    return { data: { message: 'Status updated successfully.' } };
-  }
+  const { data, error } = await supabase.from('applicants').update({ status }).eq('id', id).select('id');
+  if (error) throw { response: { status: 500, data: { message: error.message } } };
+  if (!data?.length) throw { response: { status: 404, data: { message: 'Applicant not found.' } } };
+  return { data: { message: 'Status updated.' } };
 };
 
-// 5. Excel Export
-export const exportExcel = async (filters) => {
-  if (isDemoMode()) {
-    // Generate Excel client-side in Demo Mode using xlsx package
-    const all = getDemoApplicants();
-    const filtered = filterDemoData(all, filters);
-    
-    // Transform data columns to match spec requirements exactly
-    const dataToExport = filtered.map(a => ({
-      'ID': a.id,
-      'Full Name': a.full_name,
-      'Phone': a.phone,
-      'Email': a.email,
-      'District': a.district, // dedicated column
-      'State': a.state,
-      'Education': a.education,
-      'Work Type': a.work_type,
-      'Experience (yrs)': a.experience_years,
-      'Skills': a.skills || '—',
-      'Status': a.status.toUpperCase(),
-      'Registered On': new Date(a.created_at).toLocaleDateString('en-IN')
-    }));
+export const getResumeUrl = async (applicant) => {
+  if (!applicant.resume_path) return null;
+  const { data, error } = await supabase.storage.from(RESUME_BUCKET).createSignedUrl(applicant.resume_path, 120);
+  if (error) throw { response: { status: 500, data: { message: error.message } } };
+  return data.signedUrl;
+};
 
-    // Create Worksheet
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    
-    // Add custom styling columns width
-    const colsWidth = [
-      { wch: 6 },   // ID
-      { wch: 22 },  // Full Name
-      { wch: 15 },  // Phone
-      { wch: 28 },  // Email
-      { wch: 18 },  // District
-      { wch: 14 },  // State
-      { wch: 16 },  // Education
-      { wch: 18 },  // Work Type
-      { wch: 16 },  // Experience (yrs)
-      { wch: 30 },  // Skills
-      { wch: 14 },  // Status
-      { wch: 20 },  // Registered On
-    ];
-    worksheet['!cols'] = colsWidth;
+const toExportRow = (applicant) => ({
+  'Reference ID': applicant.application_reference,
+  'Full Name': applicant.full_name,
+  Phone: applicant.phone,
+  Email: applicant.email || '',
+  City: applicant.city || '',
+  District: applicant.district,
+  State: applicant.state,
+  Education: applicant.education,
+  'Course / Trade': applicant.course_name || '',
+  'Work Type': applicant.work_type,
+  'Preferred Role': applicant.preferred_role || '',
+  'Experience (yrs)': applicant.experience_years,
+  Skills: applicant.skills || '',
+  Availability: applicant.availability || '',
+  'Resume Uploaded': applicant.resume_path ? 'Yes' : 'No',
+  Status: applicant.status.toUpperCase(),
+  'Registered On': new Date(applicant.created_at).toLocaleDateString('en-IN'),
+});
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Applicants");
-    
-    // Trigger download
-    XLSX.writeFile(workbook, `applicants_${Date.now()}.xlsx`);
-    return Promise.resolve();
-  } else {
-    // Supabase Mode Client-Side Excel Generation (No Node Backend needed!)
-    const res = await fetchApplicants(filters);
-    const filtered = res.data.applicants;
+const escapeCsvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 
-    const dataToExport = filtered.map(a => ({
-      'ID': a.id,
-      'Full Name': a.full_name,
-      'Phone': a.phone,
-      'Email': a.email,
-      'District': a.district,
-      'State': a.state,
-      'Education': a.education,
-      'Work Type': a.work_type,
-      'Experience (yrs)': a.experience_years,
-      'Skills': a.skills || '—',
-      'Status': a.status.toUpperCase(),
-      'Registered On': new Date(a.created_at).toLocaleDateString('en-IN')
-    }));
+export const exportCsv = async (filters) => {
+  const { data } = await fetchApplicants(filters);
+  const rows = data.applicants.map(toExportRow);
+  if (!rows.length) return;
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-
-    const colsWidth = [
-      { wch: 6 },   // ID
-      { wch: 22 },  // Full Name
-      { wch: 15 },  // Phone
-      { wch: 28 },  // Email
-      { wch: 18 },  // District
-      { wch: 14 },  // State
-      { wch: 16 },  // Education
-      { wch: 18 },  // Work Type
-      { wch: 16 },  // Experience (yrs)
-      { wch: 30 },  // Skills
-      { wch: 14 },  // Status
-      { wch: 20 },  // Registered On
-    ];
-    worksheet['!cols'] = colsWidth;
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Applicants");
-    XLSX.writeFile(workbook, `applicants_${Date.now()}.xlsx`);
-    return Promise.resolve();
-  }
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.map(escapeCsvCell).join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(',')),
+  ].join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `applicants_${Date.now()}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 };

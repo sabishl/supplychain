@@ -1,7 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { adminLogin, isDemoMode } from '../api/api';
-import { LogIn, Lock, Mail, ShieldAlert, Info, ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft,
+  FileText,
+  Lock,
+  LogIn,
+  Mail,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
+import { adminLogin } from '../api/api';
+import { supabase } from '../supabaseClient';
+import logo from '../assets/logo.png';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -9,133 +20,107 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [demo, setDemo] = useState(isDemoMode());
-
-  // Redirect to dashboard if already logged in
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      navigate('/admin/dashboard');
-    }
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: adminRecord } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      if (adminRecord) navigate('/admin/dashboard');
+    });
   }, [navigate]);
 
-  // Keep track of the active mode
-  useEffect(() => {
-    const checkMode = () => {
-      setDemo(isDemoMode());
-    };
-    window.addEventListener('storage', checkMode);
-    return () => window.removeEventListener('storage', checkMode);
-  }, []);
-
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
+  const handleLoginSubmit = async (event) => {
+    event.preventDefault();
     if (!email || !password) {
-      setError('Please fill in all fields.');
+      setError('Please enter your email and password.');
       return;
     }
 
     setLoading(true);
     setError('');
-
     try {
-      const res = await adminLogin(email, password);
-      localStorage.setItem('admin_token', res.data.token);
+      await adminLogin(email, password);
       navigate('/admin/dashboard');
-    } catch (err) {
-      setError(
-        err.response?.data?.message || 'Login failed. Please verify credentials.'
-      );
+    } catch (loginError) {
+      setError(loginError.response?.data?.message || 'Login failed. Please verify your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="app-container hero-gradient" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      
-      <div style={{ position: 'absolute', top: '2rem', left: '2rem' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.9rem' }}>
-          <ArrowLeft size={16} />
-          Back to Registration Form
-        </Link>
-      </div>
+    <div className="auth-page">
+      <Link to="/" className="auth-back">
+        <ArrowLeft size={16} />
+        Back to applicant form
+      </Link>
 
-      <div className="card-panel animate-fade-in" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem 2rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: '3rem', height: '3rem', borderRadius: '50%', background: 'var(--color-primary-light)', display: 'inline-flex', alignItems: 'center', justifyCenter: 'center', color: 'var(--color-primary)', justifyContent: 'center', marginBottom: '1rem' }}>
-            <Lock size={20} />
+      <main className="auth-layout">
+        <section className="auth-intro">
+          <img src={logo} alt="Manpower Chain Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '1.75rem', backgroundColor: '#fff', padding: '8px', borderRadius: '10px', boxShadow: 'var(--shadow-sm)' }} />
+          <p className="eyebrow">ADMIN WORKSPACE</p>
+          <h1>Manage placements with confidence.</h1>
+          <p>Securely review profiles, check resumes, and move candidates through each recruitment stage.</p>
+          <div className="auth-benefits">
+            <span><Users size={18} /> Structured candidate profiles</span>
+            <span><FileText size={18} /> Private resume access</span>
+            <span><ShieldCheck size={18} /> Authorized team members only</span>
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>Admin Portal Login</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            {demo ? 'Accessing dashboard in Demo Mode' : 'Sign in to access secure dashboard data'}
-          </p>
-        </div>
+        </section>
 
-        <form onSubmit={handleLoginSubmit}>
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Mail size={14} />
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(''); }}
-              placeholder="admin@yourcompany.com"
-              required
-              autoFocus
-            />
+        <section className="card-panel auth-card animate-fade-in">
+          <div className="auth-card-heading">
+            <div className="auth-lock"><Lock size={20} /></div>
+            <h2>Admin sign in</h2>
+            <p>
+              Use your authorized account to access applicant records.
+            </p>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '1.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Lock size={14} />
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(''); }}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'var(--status-rejected-bg)', color: 'var(--status-rejected-text)', borderRadius: '6px', marginBottom: '1.25rem', fontSize: '0.85rem', fontWeight: 500 }} className="animate-fade-in">
-              <ShieldAlert size={16} />
-              <span>{error}</span>
+          <form className="auth-form" onSubmit={handleLoginSubmit}>
+            <div className="form-group">
+              <label className="label-with-icon" htmlFor="admin-email">
+                <Mail size={14} /> Work email
+              </label>
+              <input
+                id="admin-email"
+                type="email"
+                value={email}
+                onChange={(event) => { setEmail(event.target.value); setError(''); }}
+                placeholder="admin@yourcompany.com"
+                required
+                autoFocus
+              />
             </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' }}
-          >
-            {loading ? 'Logging in...' : (
-              <>
-                <LogIn size={16} />
-                Access Dashboard
-              </>
+            <div className="form-group">
+              <label className="label-with-icon" htmlFor="admin-password">
+                <Lock size={14} /> Password
+              </label>
+              <input
+                id="admin-password"
+                type="password"
+                value={password}
+                onChange={(event) => { setPassword(event.target.value); setError(''); }}
+                placeholder="Enter password"
+                required
+              />
+            </div>
+            {error && (
+              <div className="auth-error animate-fade-in">
+                <ShieldAlert size={16} />
+                <span>{error}</span>
+              </div>
             )}
-          </button>
-        </form>
+            <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+              {loading ? 'Signing in...' : <><LogIn size={16} /> Access dashboard</>}
+            </button>
+          </form>
 
-        {demo && (
-          <div style={{ display: 'flex', gap: '0.5rem', padding: '1rem', background: 'var(--color-primary-light)', color: 'var(--color-primary)', borderRadius: '8px', marginTop: '2rem', fontSize: '0.8rem', lineHeight: '1.4' }} className="animate-fade-in">
-            <Info size={16} style={{ flexShrink: 0 }} />
-            <div>
-              <p style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Demo Mode Default Credentials:</p>
-              <p><strong>Email:</strong> admin@yourcompany.com</p>
-              <p><strong>Password:</strong> YourStrongPassword123!</p>
-            </div>
-          </div>
-        )}
-      </div>
-
+        </section>
+      </main>
     </div>
   );
 }

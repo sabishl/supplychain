@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import FilterBar from '../components/FilterBar';
 import ApplicantTable from '../components/ApplicantTable';
-import { fetchApplicants, exportExcel, isDemoMode, adminLogout } from '../api/api';
-import { LogOut, Download, RefreshCw, Layers, Users, Clock, Star, CheckCircle, Database } from 'lucide-react';
+import { fetchApplicants, exportCsv, adminLogout } from '../api/api';
+import logo from '../assets/logo.png';
+import { LogOut, Download, RefreshCw, Users, Clock, Star, CheckCircle } from 'lucide-react';
 
 const EMPTY_FILTERS = {
+  search: '',
+  state: '',
   district: '',
   education: '',
   work_type: '',
   min_exp: '',
   max_exp: '',
+  resume: '',
   status: '',
 };
 
@@ -23,13 +27,10 @@ export default function AdminDashboard() {
   const [total, setTotal] = useState(0);
   const [lastUpdated, setLastUpdated] = useState('');
   
-  // App mode state (Demo / Live Server)
-  const [demoMode, setDemoMode] = useState(isDemoMode());
-
   // Overall Statistics calculated from the total list of applicants (unfiltered or overall database)
   const [stats, setStats] = useState({
     total: 0,
-    pending: 0,
+    newApplications: 0,
     shortlisted: 0,
     placed: 0,
   });
@@ -56,8 +57,8 @@ export default function AdminDashboard() {
       const allItems = allRes.data.applicants;
       setStats({
         total: allItems.length,
-        pending: allItems.filter(a => a.status === 'pending').length,
-        shortlisted: allItems.filter(a => a.status === 'shortlisted').length,
+        newApplications: allItems.filter(a => a.status === 'new' || a.status === 'pending').length,
+        shortlisted: allItems.filter(a => ['shortlisted', 'interview', 'selected'].includes(a.status)).length,
         placed: allItems.filter(a => a.status === 'placed').length,
       });
 
@@ -65,7 +66,6 @@ export default function AdminDashboard() {
       console.error('Fetch applicants error:', err);
       // Unauthorized or invalid session: redirect to login
       if (err.response?.status === 401 || err.response?.status === 403) {
-        localStorage.removeItem('admin_token');
         navigate('/admin/login');
       }
     } finally {
@@ -74,7 +74,8 @@ export default function AdminDashboard() {
   }, [filters, navigate]);
 
   useEffect(() => {
-    loadData();
+    const timerId = setTimeout(() => loadData(), 0);
+    return () => clearTimeout(timerId);
   }, [loadData]);
 
   // Handle logging out
@@ -84,73 +85,48 @@ export default function AdminDashboard() {
   };
 
   // Handle spreadsheet export
-  const handleExportExcel = async () => {
+  const handleExportCsv = async () => {
     setExporting(true);
     try {
       const cleanFilters = getCleanFilters(filters);
-      await exportExcel(cleanFilters);
+      await exportCsv(cleanFilters);
     } catch (err) {
-      console.error('Excel download failed:', err);
+      console.error('CSV download failed:', err);
     } finally {
       setExporting(false);
     }
   };
 
-  // Toggle mode (Demo / Live)
-  const handleModeToggle = () => {
-    const nextMode = demoMode ? 'live' : 'demo';
-    localStorage.setItem('app_mode', nextMode);
-    setDemoMode(nextMode === 'demo');
-    // Dispatch a dummy storage event so other open pages update too
-    window.dispatchEvent(new Event('storage'));
-    
-    // Clear filters and reload
-    setFilters(EMPTY_FILTERS);
-  };
-
   return (
-    <div className="app-container">
-      {/* Admin header */}
-      <header className="nav-header" style={{ padding: '0.75rem 2rem' }}>
+    <div className="app-container admin-shell">
+      <header className="nav-header admin-header">
         <Link to="/admin/dashboard" className="brand">
-          <div style={{ width: '2rem', height: '2rem', borderRadius: '6px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '0.9rem' }}>
-            A
-          </div>
-          <span className="brand-title" style={{ fontSize: '1.1rem' }}>Admin Dashboard</span>
+          <img src={logo} alt="Manpower Chain Logo" style={{ height: '44px', objectFit: 'contain' }} />
+          <span className="admin-brand-copy">
+            <strong>Recruitment Console</strong>
+          </span>
         </Link>
 
-        {/* Action controls in header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          
-          {/* Live vs Demo Toggle Switch */}
-          <div className="switch-container">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: demoMode ? 'var(--text-secondary)' : 'var(--color-primary)', fontWeight: 600, fontSize: '0.8rem' }}>
-              <Database size={14} />
-              <span>{demoMode ? 'Demo Database' : 'Live API Server'}</span>
-            </div>
-            <label className="switch">
-              <input type="checkbox" checked={!demoMode} onChange={handleModeToggle} />
-              <span className="slider"></span>
-            </label>
-          </div>
+        <div className="admin-controls">
+          <span className="mode-pill live">
+            Secure live workspace
+          </span>
 
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <span className="updated-label">
             Updated: {lastUpdated || 'Loading...'}
           </span>
 
           <button 
-            className="btn btn-outline" 
+            className="btn btn-outline admin-refresh" 
             onClick={loadData}
-            title="Refresh Data"
-            style={{ padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Refresh candidate register"
           >
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
           </button>
 
           <button 
-            className="btn btn-secondary" 
+            className="btn btn-secondary logout-action" 
             onClick={handleLogout}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
           >
             <LogOut size={14} />
             Logout
@@ -159,12 +135,19 @@ export default function AdminDashboard() {
       </header>
 
       {/* Main dashboard body */}
-      <main style={{ flex: 1, padding: '2rem' }}>
+      <main className="dashboard-main">
+        <div className="dashboard-title">
+          <div>
+            <span className="eyebrow">OPERATIONS DASHBOARD</span>
+            <h1>Recruitment workspace</h1>
+            <p>Find the right people faster, review documents, and track placement progress.</p>
+          </div>
+        </div>
         
         {/* Dynamic statistics counter cards */}
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon-wrapper" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+            <div className="stat-icon-wrapper total">
               <Users size={20} />
             </div>
             <div className="stat-details">
@@ -174,27 +157,27 @@ export default function AdminDashboard() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon-wrapper" style={{ background: 'var(--status-pending-bg)', color: 'var(--status-pending-text)' }}>
+            <div className="stat-icon-wrapper new-applications">
               <Clock size={20} />
             </div>
             <div className="stat-details">
-              <span className="stat-value">{stats.pending}</span>
-              <span className="stat-label">Pending Review</span>
+              <span className="stat-value">{stats.newApplications}</span>
+              <span className="stat-label">New Applications</span>
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon-wrapper" style={{ background: 'var(--status-shortlisted-bg)', color: 'var(--status-shortlisted-text)' }}>
+            <div className="stat-icon-wrapper shortlisted">
               <Star size={20} />
             </div>
             <div className="stat-details">
               <span className="stat-value">{stats.shortlisted}</span>
-              <span className="stat-label">Shortlisted</span>
+              <span className="stat-label">Active Shortlist</span>
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon-wrapper" style={{ background: 'var(--status-placed-bg)', color: 'var(--status-placed-text)' }}>
+            <div className="stat-icon-wrapper placed">
               <CheckCircle size={20} />
             </div>
             <div className="stat-details">
@@ -212,33 +195,25 @@ export default function AdminDashboard() {
         />
 
         {/* Table summary actions bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2rem 0 1rem' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-            Applicants ({total} matching)
+        <div className="results-header">
+          <h2>
+            Candidates <span>({total} matching)</span>
           </h2>
 
           <button
-            className="btn btn-primary"
-            onClick={handleExportExcel}
+            className="btn btn-primary export-action"
+            onClick={handleExportCsv}
             disabled={total === 0 || exporting}
-            style={{ 
-              background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
-              fontSize: '0.9rem',
-              padding: '0.6rem 1.2rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
           >
             <Download size={16} />
-            {exporting ? 'Downloading...' : 'Download Excel (.xlsx)'}
+            {exporting ? 'Downloading...' : 'Export CSV'}
           </button>
         </div>
 
         {/* Data results list table */}
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem', gap: '1rem', color: 'var(--text-secondary)' }}>
-            <RefreshCw size={32} className="spin" style={{ animationDuration: '1.5s', color: 'var(--color-primary)' }} />
+          <div className="dashboard-loading">
+            <RefreshCw size={32} className="spin" />
             <span>Updating applicant register...</span>
           </div>
         ) : (
@@ -249,16 +224,6 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* CSS Spin Keyframes for loading icon */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }

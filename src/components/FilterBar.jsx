@@ -1,111 +1,107 @@
-import React from 'react';
-import { RotateCcw, Filter } from 'lucide-react';
-
-const DISTRICTS = [
-  'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha', 'Kottayam',
-  'Idukki', 'Ernakulam', 'Thrissur', 'Palakkad', 'Malappuram',
-  'Kozhikode', 'Wayanad', 'Kannur', 'Kasaragod'
-];
-
-const EDUCATION_OPTIONS = [
-  'Below SSLC', 'SSLC', 'Plus Two', 'ITI', 'Diploma', 'Degree', 'Post Graduate'
-];
-
-const WORK_TYPES = [
-  'Construction Worker', 'Plumber', 'Electrician', 'Driver', 'Cleaning Staff',
-  'Cook / Kitchen Helper', 'Security Guard', 'IT Support', 'General Helper', 'Other'
-];
+import { useEffect, useState } from 'react';
+import { Filter, RotateCcw, Search } from 'lucide-react';
+import {
+  APPLICATION_STATUSES,
+  EDUCATION_OPTIONS,
+  INDIAN_STATES,
+  WORK_TYPES,
+  loadDistricts,
+} from '../data/formOptions';
 
 export default function FilterBar({ filters, setFilters, onReset }) {
-  const handleFilterChange = (field) => (e) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: e.target.value,
+  const [districts, setDistricts] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!filters.state) {
+      return undefined;
+    }
+    loadDistricts(filters.state).then((items) => {
+      if (active) setDistricts(items);
+    });
+    return () => {
+      active = false;
+    };
+  }, [filters.state]);
+
+  const change = (field) => (event) => {
+    const value = event.target.value;
+    if (field === 'state') setDistricts([]);
+    setFilters((previous) => ({
+      ...previous,
+      [field]: value,
+      ...(field === 'state' ? { district: '' } : {}),
     }));
   };
 
   return (
-    <div className="filter-panel animate-fade-in">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-        <Filter size={18} style={{ color: 'var(--color-primary)' }} />
-        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Filter Applicants</h3>
-      </div>
-      
-      <div className="filter-grid">
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>District</label>
-          <select value={filters.district} onChange={handleFilterChange('district')}>
-            <option value="">All Districts</option>
-            {DISTRICTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+    <section className="filter-panel animate-fade-in">
+      <div className="filter-heading">
+        <div>
+          <h3><Filter size={18} /> Find suitable candidates</h3>
+          <p>Search profiles by location, qualification, readiness, and hiring stage.</p>
         </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Education</label>
-          <select value={filters.education} onChange={handleFilterChange('education')}>
-            <option value="">All Education</option>
-            {EDUCATION_OPTIONS.map((e) => (
-              <option key={e} value={e}>{e}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Work Type</label>
-          <select value={filters.work_type} onChange={handleFilterChange('work_type')}>
-            <option value="">All Work Types</option>
-            {WORK_TYPES.map((w) => (
-              <option key={w} value={w}>{w}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Min Experience (Yrs)</label>
-          <input
-            type="number"
-            min="0"
-            max="50"
-            value={filters.min_exp}
-            onChange={handleFilterChange('min_exp')}
-            placeholder="0"
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Max Experience (Yrs)</label>
-          <input
-            type="number"
-            min="0"
-            max="50"
-            value={filters.max_exp}
-            onChange={handleFilterChange('max_exp')}
-            placeholder="50"
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Status</label>
-          <select value={filters.status} onChange={handleFilterChange('status')}>
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="shortlisted">Shortlisted</option>
-            <option value="placed">Placed</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-
-        <button 
-          className="btn btn-secondary" 
-          onClick={onReset}
-          style={{ height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <RotateCcw size={16} />
-          Reset
+        <button className="btn btn-secondary" type="button" onClick={onReset}>
+          <RotateCcw size={15} /> Reset filters
         </button>
       </div>
-    </div>
+      <div className="search-field">
+        <Search size={18} />
+        <input value={filters.search} onChange={change('search')} placeholder="Search by name, mobile number, or application reference" />
+      </div>
+      <div className="filter-grid">
+        <div className="form-group">
+          <label>State</label>
+          <select value={filters.state} onChange={change('state')}>
+            <option value="">All states</option>
+            {INDIAN_STATES.map((state) => <option key={state.name}>{state.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>District</label>
+          <select value={filters.district} onChange={change('district')} disabled={!filters.state || districts.length === 0}>
+            <option value="">{filters.state ? 'All districts' : 'Select state first'}</option>
+            {districts.map((district) => <option key={district}>{district}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Job category</label>
+          <select value={filters.work_type} onChange={change('work_type')}>
+            <option value="">All categories</option>
+            {WORK_TYPES.map((workType) => <option key={workType}>{workType}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Education</label>
+          <select value={filters.education} onChange={change('education')}>
+            <option value="">All qualifications</option>
+            {EDUCATION_OPTIONS.map((education) => <option key={education}>{education}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Resume</label>
+          <select value={filters.resume} onChange={change('resume')}>
+            <option value="">Any</option>
+            <option value="yes">Resume uploaded</option>
+            <option value="no">No resume</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Status</label>
+          <select value={filters.status} onChange={change('status')}>
+            <option value="">All stages</option>
+            {APPLICATION_STATUSES.map((status) => <option value={status.value} key={status.value}>{status.label}</option>)}
+          </select>
+        </div>
+        <div className="form-group narrow-filter">
+          <label>Min exp.</label>
+          <input type="number" min="0" max="50" value={filters.min_exp} onChange={change('min_exp')} placeholder="0 yrs" />
+        </div>
+        <div className="form-group narrow-filter">
+          <label>Max exp.</label>
+          <input type="number" min="0" max="50" value={filters.max_exp} onChange={change('max_exp')} placeholder="50 yrs" />
+        </div>
+      </div>
+    </section>
   );
 }

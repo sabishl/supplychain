@@ -1,14 +1,14 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Plus } from 'lucide-react';
+import { ShieldCheck, Plus, Hash } from 'lucide-react';
 
 export default function SuccessPage() {
   const location = useLocation();
   const applicantName = location.state?.applicantName || 'Applicant';
+  const reference = location.state?.reference;
 
   return (
-    <div className="app-container hero-gradient" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div className="card-panel animate-fade-in" style={{ width: '100%', maxWidth: '480px', textAlign: 'center', padding: '3.5rem 2rem' }}>
+    <div className="app-container hero-gradient success-page">
+      <div className="card-panel animate-fade-in success-card">
         
         {/* Animated Checkmark UI */}
         <div className="success-checkmark">
@@ -20,36 +20,38 @@ export default function SuccessPage() {
           </div>
         </div>
 
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Registration Successful!
+        <h2>
+          Application Submitted!
         </h2>
         
-        <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+        <p className="success-name">
           Thank you, {applicantName}!
         </p>
         
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2.5rem' }}>
-          Your profile details have been saved to our manpower supply chain network. Our operations team will review your qualifications and contact you soon.
+        <p className="success-copy">
+          Your job profile has been received. Our placement team will review your qualifications and contact you when a suitable opportunity is available.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {reference && (
+          <div className="reference-card">
+            <span><Hash size={14} /> Application reference</span>
+            <strong>{reference}</strong>
+            <small>Keep this number for future communication.</small>
+          </div>
+        )}
+
+        <div className="success-actions">
           <Link 
             to="/" 
-            className="btn btn-primary" 
-            style={{ 
-              background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}
+            className="btn btn-primary submit-action"
           >
             <Plus size={16} />
-            Register Another Person
+            Submit another application
           </Link>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+          <div className="success-security">
             <ShieldCheck size={14} />
-            <span>Secure Public Form Submission</span>
+            <span>Your application details are handled securely</span>
           </div>
         </div>
 
