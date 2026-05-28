@@ -6,15 +6,17 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
+
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         {/* Public Applicant Pathways */}
         <Route path="/" element={<RegisterPage />} />
         <Route path="/success" element={<SuccessPage />} />
 
         {/* Secure Admin Pathways */}
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminLogin />} />
         <Route 
           path="/admin/dashboard" 
           element={

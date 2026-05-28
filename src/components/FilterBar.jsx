@@ -36,18 +36,23 @@ export default function FilterBar({ filters, setFilters, onReset }) {
 
   return (
     <section className="filter-panel animate-fade-in">
-      <div className="filter-heading">
-        <div>
-          <h3><Filter size={18} /> Find suitable candidates</h3>
-          <p>Search profiles by location, qualification, readiness, and hiring stage.</p>
-        </div>
-        <button className="btn btn-secondary" type="button" onClick={onReset}>
-          <RotateCcw size={15} /> Reset filters
+      <div className="filter-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '0.5rem' }}>
+        <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0, fontWeight: 700 }}>
+          <Filter size={16} className="text-primary-color" /> Filters
+        </h3>
+        <button 
+          className="btn btn-secondary" 
+          type="button" 
+          onClick={onReset}
+          style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', gap: '0.25rem', borderRadius: '6px' }}
+          title="Reset all filters"
+        >
+          <RotateCcw size={12} /> Reset
         </button>
       </div>
-      <div className="search-field">
-        <Search size={18} />
-        <input value={filters.search} onChange={change('search')} placeholder="Search by name, mobile number, or application reference" />
+      <div className="search-field" style={{ marginBottom: '1rem' }}>
+        <Search size={16} />
+        <input value={filters.search} onChange={change('search')} placeholder="Search candidates..." />
       </div>
       <div className="filter-grid">
         <div className="form-group">

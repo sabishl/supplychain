@@ -307,8 +307,8 @@ input:focus, select:focus, textarea:focus {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
   align-items: flex-end;
 }
 
@@ -525,6 +525,18 @@ input:focus, select:focus, textarea:focus {
   padding: 2.5rem 0;
 }
 
+.hero-logo {
+  max-width: min(200px, 100%);
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 2rem;
+  background-color: #ffffff;
+  padding: 0.65rem 1.15rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: block;
+}
+
 .eyebrow {
   display: inline-flex;
   padding: 0.38rem 0.75rem;
@@ -617,7 +629,8 @@ input:focus, select:focus, textarea:focus {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
-  transition: width 0.3s ease;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(21, 101, 192, 0.25);
 }
 
 .step-tabs {
@@ -1596,6 +1609,36 @@ input:focus, select:focus, textarea:focus {
 
   .narrow-filter {
     max-width: unset;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Dashboard Grid Layout */
+.dashboard-workspace {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.dashboard-workspace .filter-grid {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.dashboard-results-area {
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-workspace {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 }
 

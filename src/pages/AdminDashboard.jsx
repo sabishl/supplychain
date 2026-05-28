@@ -66,7 +66,7 @@ export default function AdminDashboard() {
       console.error('Fetch applicants error:', err);
       // Unauthorized or invalid session: redirect to login
       if (err.response?.status === 401 || err.response?.status === 403) {
-        navigate('/admin/login');
+        navigate('/admin');
       }
     } finally {
       setLoading(false);
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
   // Handle logging out
   const handleLogout = async () => {
     await adminLogout();
-    navigate('/admin/login');
+    navigate('/admin');
   };
 
   // Handle spreadsheet export
@@ -188,40 +188,44 @@ export default function AdminDashboard() {
         </div>
 
         {/* Interactive Filters Panel */}
-        <FilterBar 
-          filters={filters} 
-          setFilters={setFilters} 
-          onReset={() => setFilters(EMPTY_FILTERS)} 
-        />
-
-        {/* Table summary actions bar */}
-        <div className="results-header">
-          <h2>
-            Candidates <span>({total} matching)</span>
-          </h2>
-
-          <button
-            className="btn btn-primary export-action"
-            onClick={handleExportCsv}
-            disabled={total === 0 || exporting}
-          >
-            <Download size={16} />
-            {exporting ? 'Downloading...' : 'Export CSV'}
-          </button>
-        </div>
-
-        {/* Data results list table */}
-        {loading ? (
-          <div className="dashboard-loading">
-            <RefreshCw size={32} className="spin" />
-            <span>Updating applicant register...</span>
-          </div>
-        ) : (
-          <ApplicantTable 
-            applicants={applicants} 
-            onStatusChange={loadData} 
+        <div className="dashboard-workspace">
+          <FilterBar 
+            filters={filters} 
+            setFilters={setFilters} 
+            onReset={() => setFilters(EMPTY_FILTERS)} 
           />
-        )}
+
+          <div className="dashboard-results-area">
+            {/* Table summary actions bar */}
+            <div className="results-header">
+              <h2>
+                Candidates <span>({total} matching)</span>
+              </h2>
+
+              <button
+                className="btn btn-primary export-action"
+                onClick={handleExportCsv}
+                disabled={total === 0 || exporting}
+              >
+                <Download size={16} />
+                {exporting ? 'Downloading...' : 'Export CSV'}
+              </button>
+            </div>
+
+            {/* Data results list table */}
+            {loading ? (
+              <div className="dashboard-loading">
+                <RefreshCw size={32} className="spin" />
+                <span>Updating applicant register...</span>
+              </div>
+            ) : (
+              <ApplicantTable 
+                applicants={applicants} 
+                onStatusChange={loadData} 
+              />
+            )}
+          </div>
+        </div>
       </main>
 
     </div>

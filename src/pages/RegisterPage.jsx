@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Briefcase,
   CheckCircle2,
@@ -203,16 +203,9 @@ export default function RegisterPage() {
 
   return (
     <div className="app-container hero-gradient">
-      <header className="nav-header public-header">
-        <Link to="/" className="brand">
-          <img src={logo} alt="Manpower Chain Logo" style={{ height: '44px', objectFit: 'contain' }} />
-        </Link>
-        <Link to="/admin/login" className="btn btn-outline header-action">Admin Portal</Link>
-      </header>
-
       <main className="application-layout">
         <section className="application-intro">
-          <img src={logo} alt="Manpower Chain Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '1.75rem', backgroundColor: '#fff', padding: '8px', borderRadius: '10px', boxShadow: 'var(--shadow-sm)', display: 'block' }} />
+          <img src={logo} alt="Manpower Chain Logo" className="hero-logo" />
           <span className="eyebrow">JOB SEEKER APPLICATION</span>
           <h1>Find work that matches your skills.</h1>
           <p>Tell us about your experience once. Our placement team will review your profile and contact you for suitable jobs.</p>
