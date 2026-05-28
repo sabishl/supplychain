@@ -98,13 +98,12 @@ export default function FilterBar({ filters, setFilters, onReset }) {
             {APPLICATION_STATUSES.map((status) => <option value={status.value} key={status.value}>{status.label}</option>)}
           </select>
         </div>
-        <div className="form-group narrow-filter">
-          <label>Min exp.</label>
-          <input type="number" min="0" max="50" value={filters.min_exp} onChange={change('min_exp')} placeholder="0 yrs" />
-        </div>
-        <div className="form-group narrow-filter">
-          <label>Max exp.</label>
-          <input type="number" min="0" max="50" value={filters.max_exp} onChange={change('max_exp')} placeholder="50 yrs" />
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label>Experience (Yrs)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <input type="number" min="0" max="50" value={filters.min_exp} onChange={change('min_exp')} placeholder="Min" />
+            <input type="number" min="0" max="50" value={filters.max_exp} onChange={change('max_exp')} placeholder="Max" />
+          </div>
         </div>
       </div>
     </section>

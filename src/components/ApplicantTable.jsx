@@ -10,6 +10,7 @@ import {
   Phone,
   SearchCheck,
   X,
+  ChevronRight,
 } from 'lucide-react';
 import { getResumeUrl, updateStatus } from '../api/api';
 import { APPLICATION_STATUSES } from '../data/formOptions';
@@ -63,7 +64,14 @@ export default function ApplicantTable({ applicants, onStatusChange }) {
       {message && <div className="dashboard-message">{message}<button onClick={() => setMessage('')} type="button"><X size={14} /></button></div>}
       <div className="candidate-list">
         {applicants.map((applicant) => (
-          <article className="candidate-card" key={applicant.id}>
+          <article 
+            className="candidate-card clickable" 
+            key={applicant.id}
+            onClick={() => setSelected(applicant)}
+          >
+            <div className="candidate-avatar">
+              {applicant.full_name?.substring(0, 2).toUpperCase() || 'AB'}
+            </div>
             <div className="candidate-primary">
               <span className="candidate-reference">{applicant.application_reference || `#${applicant.id}`}</span>
               <h3>{applicant.full_name}</h3>
@@ -77,7 +85,7 @@ export default function ApplicantTable({ applicants, onStatusChange }) {
             <div className="candidate-actions">
               {applicant.resume_path && <span className="cv-badge"><FileText size={13} /> CV</span>}
               <span className={`status-badge ${applicant.status}`}>{statusLabel(applicant.status)}</span>
-              <button type="button" className="btn btn-outline" onClick={() => setSelected(applicant)}>View profile</button>
+              <ChevronRight size={18} className="card-chevron" />
             </div>
           </article>
         ))}
